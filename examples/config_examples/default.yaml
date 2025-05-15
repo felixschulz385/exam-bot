@@ -1,0 +1,77 @@
+# Simplified Exam Generator Configuration
+
+# Input/output settings
+io:
+  question_bank_path: "data/Question Database.xlsx"
+  output_dir: "output/"
+  timestamp_output: true
+
+# Exam structure
+exam:
+  title: "Advanced Health Economics - Final Exam 2025"
+  randomize_order: false  # Keep order due to blocks
+  header_text: false
+  # Add the exam instructions here
+  instructions: |
+    ### Instructions
+    For any question in this exam, there is EXACTLY ONE correct answer choice.
+    Time management: The exam is worth 60 points total, with a suggested pace of 1 minute per point.
+    Please answer the questions on the separate Answer Sheet in the box corresponding to the question number. Other answers will not be considered. No partial credit is available.
+    Good luck!
+
+# Selection settings
+selection:
+  method: "unified"
+  seed: 20250514  # Set for reproducible selection
+  target_points: 60  # Target total points for the exam
+  dynamic_sizing: false  # Turn off dynamic sizing when using target points
+  max_per_type:
+    "Single Choice": 100
+    "Multiple Choice": 0
+    "True/False": 100
+    "Single Choice Block": 6
+  semantic:
+    model: "paraphrase-multilingual-MiniLM-L12-v2"
+    cache_dir: "cache/embeddings"
+    cluster_ratio: 0.25
+
+# Grading scheme
+grading:
+  topic_points:
+    "Demand for healthcare": 6
+    "Economics of vaccination": 6
+    "Demand for health insurance": 6
+    "Adverse Selection": 6
+    "Behavioral health economics": 6
+    "Cost-effectiveness": 6
+    "Randomized controlled trials": 6
+    "Matching & instrumental variable estimators": 6
+    "Difference-in-differences estimation": 6
+    "Regression discontinuity design": 6
+  type_points:
+    "Single Choice": 3
+    "Multiple Choice": 3
+    "True/False": 2
+    "Single Choice Block": 4
+
+# Document generation
+document:
+  student_version: true
+  instructor_version: true
+  include_topic_headers: false
+  include_type_headers: false
+  randomize_answers: true
+  block_questions:
+    indent_questions: false
+    include_medium: true
+    add_images: true
+    image_directory: "data/Figures"
+  format:
+    font: "Arial"
+    font_size: 11
+    line_spacing: 1.5
+
+# Logging
+logging:
+  level: "INFO"
+  file: "exam_generator_unified.log"

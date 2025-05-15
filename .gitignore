@@ -1,0 +1,55 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# IDE and Editor Files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Dependencies and Build Output
+node_modules/
+vendor/
+dist/
+build/
+*.log
+
+# Environment Files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+*.bak
+*.pkl
+
+# Exam solutions
+output/
+data/
