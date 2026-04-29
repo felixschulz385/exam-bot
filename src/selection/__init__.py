@@ -1,3 +1,4 @@
-from .unified_sampler import UnifiedSampler
+from .sampler import UnifiedSampler
+from .semantic_search import SelectionItem
 
-__all__ = ['UnifiedSampler']
+__all__ = ['UnifiedSampler', 'SelectionItem']

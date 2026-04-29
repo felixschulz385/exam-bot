@@ -1,10 +1,14 @@
-from docx import Document
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import logging
 import re
 
 logger = logging.getLogger(__name__)
+
+try:
+    from docx import Document
+except ImportError:
+    Document = None
 
 class TemplateProcessor:
     """Process templates with placeholders for exam generation."""
@@ -29,6 +33,8 @@ class TemplateProcessor:
         Returns:
             Document object
         """
+        if Document is None:
+            raise ImportError("python-docx is required to use TemplateProcessor")
         try:
             return Document(self.template_path)
         except Exception as e:

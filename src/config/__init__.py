@@ -1,6 +1,7 @@
 from .config_loader import ConfigLoader
 from .defaults import (
     DEFAULT_CONFIG, 
+    DEFAULT_CONFIG_PATH,
     POINT_MAPPING_SCHEMA, 
     DEFAULT_QUESTION_TYPES,
     SELECTION_METHOD_DESCRIPTIONS
@@ -9,6 +10,7 @@ from .defaults import (
 __all__ = [
     'ConfigLoader', 
     'DEFAULT_CONFIG', 
+    'DEFAULT_CONFIG_PATH',
     'POINT_MAPPING_SCHEMA', 
     'DEFAULT_QUESTION_TYPES',
     'SELECTION_METHOD_DESCRIPTIONS'

@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from src.utils import ensure_directory
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +15,32 @@ class MarkingSheetGenerator:
         Args:
             output_dir: Directory to save marking sheets
         """
-        self.output_dir = Path(output_dir)
-        
-        # Create output directory if it doesn't exist
-        if not self.output_dir.exists():
-            self.output_dir.mkdir(parents=True)
-            logger.info(f"Created output directory: {self.output_dir}")
+        self.output_dir = ensure_directory(Path(output_dir))
+        logger.info(f"Using output directory: {self.output_dir}")
+
+    def _normalize_correct_answer(self, raw_value: object) -> Optional[int]:
+        """Normalize numeric or letter answer keys to a 1-based answer index."""
+        if raw_value is None or pd.isna(raw_value):
+            return None
+
+        if isinstance(raw_value, str):
+            stripped = raw_value.strip().upper()
+            if not stripped:
+                return None
+            if stripped in {"A", "B", "C", "D"}:
+                return ord(stripped) - 64
+            try:
+                numeric_value = int(stripped)
+            except ValueError:
+                return None
+            return numeric_value if 1 <= numeric_value <= 4 else None
+
+        try:
+            numeric_value = int(raw_value)
+        except (TypeError, ValueError):
+            return None
+
+        return numeric_value if 1 <= numeric_value <= 4 else None
     
     def generate_marking_sheet(self, 
                           questions: pd.DataFrame, 
@@ -45,7 +66,7 @@ class MarkingSheetGenerator:
     
         # Get type points for adding to questions
         grading_config = config.get("grading", {})
-        type_points = grading_config.get("type_points", {})
+        type_points = grading_config.get("points_per_type", {})
     
         # Process questions in the order they appear in the exam
         for question_num, (idx, row) in enumerate(questions.iterrows(), 1):
@@ -55,7 +76,7 @@ class MarkingSheetGenerator:
             topic = row['Topic']
             
             # Get correct answer number
-            correct_answer_num = row.get('Correct', None)
+            correct_answer_num = self._normalize_correct_answer(row.get('Correct', None))
             
             # Get correct answer letter - apply randomization if enabled
             correct_answer_letter = ""

@@ -1,8 +1,8 @@
 import yaml
 import json
-import os
+import copy
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, Optional, List
 import logging
 from jsonschema import validate, ValidationError
 from .defaults import DEFAULT_CONFIG
@@ -86,7 +86,7 @@ class ConfigLoader:
         Returns:
             Configuration with defaults applied for missing values
         """
-        result = DEFAULT_CONFIG.copy()
+        result = copy.deepcopy(DEFAULT_CONFIG)
         
         # Recursively update defaults with user config
         self._recursive_update(result, config)
@@ -111,35 +111,62 @@ class ConfigLoader:
                 target[key] = value
     
     def validate_grading_scheme(self, 
-                               topic_points: Dict[str, int], 
-                               type_points: Dict[str, int]) -> bool:
-        """Validate that the grading scheme has positive values.
+                               topic_ratios: Optional[Dict[str, int]] = None,
+                               type_ratios: Optional[Dict[str, int]] = None,
+                               points_per_type: Optional[Dict[str, int]] = None,
+                               topics: Optional[List[str]] = None) -> bool:
+        """Validate that the grading and selection scheme has positive values.
         
         Args:
-            topic_points: Dictionary mapping topics to point values
-            type_points: Dictionary mapping question types to point values
+            topic_ratios: Optional dictionary mapping topics to ratio values
+            type_ratios: Dictionary mapping question types to ratio values
+            points_per_type: Dictionary mapping question types to point values
+            topics: Optional list of selectable topics when topic ratios are not used
             
         Returns:
             True if grading scheme is valid, False otherwise
         """
-        # Check for negative or zero values
-        for topic, points in topic_points.items():
-            if points <= 0:
-                logger.error(f"Topic '{topic}' has invalid point value: {points}")
+        topic_ratios = topic_ratios or {}
+        type_ratios = type_ratios or {}
+        points_per_type = points_per_type or {}
+        topics = topics or []
+
+        for topic, ratio in topic_ratios.items():
+            if ratio <= 0:
+                logger.error(f"Topic '{topic}' has invalid ratio value: {ratio}")
+                return False
+
+        for topic in topics:
+            if not str(topic).strip():
+                logger.error("selection.topics must not contain blank topic names")
                 return False
                 
-        for qtype, points in type_points.items():
+        for qtype, points in points_per_type.items():
             if points <= 0:
                 logger.error(f"Question type '{qtype}' has invalid point value: {points}")
                 return False
+
+        for qtype, ratio in type_ratios.items():
+            if ratio <= 0:
+                logger.error(f"Question type '{qtype}' has invalid ratio value: {ratio}")
+                return False
         
         # Check that at least one topic and type are defined
-        if not topic_points:
-            logger.error("No topics defined in grading scheme")
+        if not topic_ratios and not topics:
+            logger.error("No topics defined for selection")
             return False
             
-        if not type_points:
-            logger.error("No question types defined in grading scheme")
+        if not type_ratios:
+            logger.error("No question types defined in selection ratios")
+            return False
+
+        if not points_per_type:
+            logger.error("No question type point mapping defined")
+            return False
+
+        missing_point_values = set(type_ratios) - set(points_per_type)
+        if missing_point_values:
+            logger.error(f"Missing point values for question types: {sorted(missing_point_values)}")
             return False
             
         return True

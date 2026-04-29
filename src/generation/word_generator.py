@@ -1,56 +1,70 @@
-from docx import Document
-from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.style import WD_STYLE_TYPE
 import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Tuple
 import logging
 import re
 import datetime
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
 import random
+from src.utils import compute_last_in_block, ensure_directory
+from .base import BaseExamGenerator
 
 logger = logging.getLogger(__name__)
 
-class WordGenerator:
+try:
+    from docx import Document
+    from docx.shared import Pt, Inches, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.style import WD_STYLE_TYPE
+except ImportError:
+    Document = None
+    Pt = Inches = RGBColor = None
+    WD_ALIGN_PARAGRAPH = WD_STYLE_TYPE = None
+
+class WordGenerator(BaseExamGenerator):
     """Generates Word document exams from selected questions."""
     
-    def __init__(self, 
-                template_path: Optional[Path] = None,
-                output_dir: Path = Path("output")):
+    def __init__(self, output_dir: Path = Path("output")):
         """Initialize Word document generator.
         
         Args:
-            template_path: Path to Word document template
             output_dir: Directory for output files
         """
-        self.template_path = template_path
-        self.output_dir = Path(output_dir)
-        self.doc_config = {}  # Store document config
-        
-        # Create output directory if it doesn't exist
-        if not self.output_dir.exists():
-            self.output_dir.mkdir(parents=True)
-            logger.info(f"Created output directory: {self.output_dir}")
+        super().__init__(output_dir=output_dir)
+        logger.info(f"Using output directory: {self.output_dir}")
+
+    _LATEX_SYMBOLS = {
+        r"\alpha": "alpha",
+        r"\beta": "beta",
+        r"\gamma": "gamma",
+        r"\delta": "delta",
+        r"\Delta": "Delta",
+        r"\theta": "theta",
+        r"\lambda": "lambda",
+        r"\pi": "pi",
+        r"\rho": "rho",
+        r"\varepsilon": "epsilon",
+        r"\epsilon": "epsilon",
+        r"\mu": "mu",
+        r"\sigma": "sigma",
+        r"\geq": ">=",
+        r"\leq": "<=",
+        r"\neq": "!=",
+        r"\cdot": "*",
+        r"\times": "x",
+        r"\mid": "|",
+    }
+
+    _SUPERSCRIPT_MAP = str.maketrans("0123456789+-=()nix", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱˣ")
+    _SUBSCRIPT_MAP = str.maketrans("0123456789+-=()aehijklmnoprstuvx", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ")
     
     def _create_document(self) -> Document:
-        """Create a new Word document from template or blank.
+        """Create a new blank Word document.
         
         Returns:
             Document object
         """
-        if self.template_path and Path(self.template_path).exists():
-            try:
-                doc = Document(self.template_path)
-                logger.info(f"Created document from template: {self.template_path}")
-                return doc
-            except Exception as e:
-                logger.error(f"Error loading template: {e}")
-                logger.info("Falling back to blank document")
-        
-        # Fall back to blank document
+        if Document is None:
+            raise ImportError("python-docx is required to generate Word documents")
         return Document()
     
     def _apply_document_styles(self, 
@@ -106,7 +120,7 @@ class WordGenerator:
         # Create a style for correct answers (instructor version)
         if 'CorrectAnswer' not in styles:
             correct_style = styles.add_style('CorrectAnswer', WD_STYLE_TYPE.CHARACTER)
-            correct_style.font.color.rgb = RGBColor(0, 128, 0)  # Green
+            correct_style.font.color.rgb = RGBColor(0, 114, 178)  # Okabe-Ito blue
             correct_style.font.bold = True
     
         # Create a style for block questions
@@ -123,7 +137,7 @@ class WordGenerator:
             block_heading_style = styles.add_style('BlockHeading', WD_STYLE_TYPE.PARAGRAPH)
             block_heading_style.base_style = styles['Heading 3']
             block_heading_style.font.bold = True
-            block_heading_style.font.color.rgb = RGBColor(50, 50, 150)  # Navy blue
+            block_heading_style.font.color.rgb = RGBColor(0, 0, 0)
     
     def _add_header_footer(self, 
                           doc: Document, 
@@ -189,8 +203,53 @@ class WordGenerator:
         """
         # Remove excess whitespace
         text = re.sub(r'\s+', ' ', text).strip()
+        text = self._render_latex_text(text)
         
         return text
+
+    def _render_latex_text(self, text: str) -> str:
+        """Convert common LaTeX-style snippets into readable Unicode/plain-text for Word output."""
+        if not text:
+            return text
+
+        rendered = str(text)
+        rendered = rendered.replace("$$", "")
+        rendered = rendered.replace(r"\(", "").replace(r"\)", "")
+        rendered = rendered.replace(r"\[", "").replace(r"\]", "")
+        rendered = re.sub(r"\\text\{([^{}]+)\}", lambda match: match.group(1), rendered)
+
+        rendered = re.sub(
+            r"\\frac\{([^{}]+)\}\{([^{}]+)\}",
+            lambda match: f"({match.group(1)})/({match.group(2)})",
+            rendered,
+        )
+
+        rendered = re.sub(
+            r"_\{([^{}]+)\}",
+            lambda match: match.group(1).translate(self._SUBSCRIPT_MAP),
+            rendered,
+        )
+        rendered = re.sub(
+            r"\^\{([^{}]+)\}",
+            lambda match: match.group(1).translate(self._SUPERSCRIPT_MAP),
+            rendered,
+        )
+        rendered = re.sub(
+            r"_([A-Za-z0-9])",
+            lambda match: match.group(1).translate(self._SUBSCRIPT_MAP),
+            rendered,
+        )
+        rendered = re.sub(
+            r"\^([A-Za-z0-9+\-])",
+            lambda match: match.group(1).translate(self._SUPERSCRIPT_MAP),
+            rendered,
+        )
+
+        for latex, replacement in self._LATEX_SYMBOLS.items():
+            rendered = rendered.replace(latex, replacement)
+
+        rendered = rendered.replace("{", "").replace("}", "")
+        return rendered
     
     def _generate_version(self, 
                     questions: pd.DataFrame, 
@@ -246,7 +305,7 @@ class WordGenerator:
         
         # Get type points for adding to questions
         grading_config = config.get("grading", {})
-        type_points = grading_config.get("type_points", {})
+        type_points = grading_config.get("points_per_type", {})
         
         # Skip topic and type headers as requested
         include_topic_headers = False  # Explicitly set to false
@@ -261,23 +320,10 @@ class WordGenerator:
         # First pass: identify last question in each block
         last_in_block = {}
         if has_block_info:
-            block_questions = {}
-            # Group questions by block
-            for idx, row in questions.iterrows():
-                try:
-                    is_block_question = question_bank_reader.is_block_question.get(idx, False)
-                    if is_block_question:
-                        block_id = question_bank_reader.get_block_for_question(idx)
-                        if block_id not in block_questions:
-                            block_questions[block_id] = []
-                        block_questions[block_id].append(idx)
-                except Exception:
-                    pass
-                    
-            # Mark last question in each block
-            for block_id, question_indices in block_questions.items():
-                if question_indices:
-                    last_in_block[question_indices[-1]] = True
+            last_in_block = compute_last_in_block(
+                question_bank_reader.get_block_questions(),
+                available_indices=list(questions.index),
+            )
 
         # Process questions
         for idx, row in questions.iterrows():
@@ -288,8 +334,7 @@ class WordGenerator:
 
             if has_block_info:
                 try:
-                    # Try accessing is_block_question as a dictionary
-                    is_block_question = question_bank_reader.is_block_question.get(idx, False)
+                    is_block_question = question_bank_reader.is_block_question(idx)
                 
                     if is_block_question:
                         block_id = question_bank_reader.get_block_for_question(idx)
@@ -568,6 +613,9 @@ class WordGenerator:
         pdf_path = docx_path.with_suffix(".pdf")
         
         try:
+            import os
+            import subprocess
+
             # First try using LibreOffice (works on many platforms)
             try:
                 # Check if libreoffice or soffice is available
@@ -749,7 +797,7 @@ class WordGenerator:
         if is_block_question and is_first_in_block:
             # Add leading text if present - with enhanced formatting
             if 'Leading Text' in question_data and pd.notna(question_data['Leading Text']):
-                leading_text = str(question_data['Leading Text'])
+                leading_text = self._format_question_text(str(question_data['Leading Text']))
                 leading_para = doc.add_paragraph()
                 leading_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                 leading_run = leading_para.add_run(leading_text)
@@ -815,22 +863,14 @@ class WordGenerator:
         
         # Add answers if requested
         if include_answers:
-            answer_choices = []
-            
-            # Get answer choices, skipping empty ones
-            for i in range(1, 5):
-                answer_key = f'Answer {i}'
-                if answer_key in question_data and pd.notna(question_data[answer_key]):
-                    answer = question_data[answer_key]
-                    # Convert answer to string to prevent "int is not iterable" error
-                    answer = str(answer)
-                    is_correct = False
-                    if 'Correct' in question_data:
-                        is_correct = i == question_data['Correct']
-                    answer_choices.append((i, chr(64 + i), answer, is_correct))
+            answer_choices = self._build_answer_choices(question_data, self._format_question_text)
         
             # Randomize answer order if requested
-            if randomize_answers:
+            should_randomize = randomize_answers and self._should_randomize_answers(
+                str(question_data.get("Type", "")),
+                answer_choices,
+            )
+            if should_randomize:
                 # Use a consistent seed based on question_num and an optional seed from config
                 # This ensures the randomization is consistent across student/instructor versions
                 random_seed = question_num
@@ -857,7 +897,7 @@ class WordGenerator:
                     answer_para.paragraph_format.left_indent = Inches(0.5 if is_first_in_block else 0.75)
                 
                 # Use randomized letter if applicable, otherwise use original letter
-                display_letter = chr(65 + idx) if randomize_answers else letter
+                display_letter = chr(65 + idx) if should_randomize else letter
                 
                 if mark_correct and is_correct:
                     # For instructor version, mark the correct answer

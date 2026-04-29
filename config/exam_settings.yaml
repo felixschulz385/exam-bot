@@ -1,0 +1,79 @@
+# Central exam generation settings.
+# Edit this file directly to change the default exam-generation behavior.
+
+io:
+  question_bank_path: "../../question database/Question Database.xlsx"
+  question_bank_sheet: "v2"
+  output_dir: "../output"
+  timestamp_output: true
+
+exam:
+  title: "Advanced Health Economics - Final Exam 2026"
+  randomize_order: false
+  header: ""
+  footer: ""
+  header_text: ""
+  instructions: |
+    For any question in this exam, there is EXACTLY ONE correct answer choice.
+    Time management: The exam is worth 60 points total, with a suggested pace of 1 minute per point.
+    Please answer the questions on the separate Answer Sheet in the box corresponding to the question number. Other answers will not be considered. No partial credit is available.
+    Good luck!
+
+selection:
+  method: "unified"
+  seed: 20250514
+  target_points: 60
+  topics:
+    - "Demand for healthcare"
+    - "Economics of vaccination"
+    - "Demand for health insurance"
+    - "Adverse Selection"
+    - "Behavioral health economics"
+    - "Randomized controlled trials"
+    - "DiD"
+    - "Matching & IV"
+    - "RDD"
+
+  type_ratios:
+    "Single Choice": 28
+    "True/False": 5
+    "Single Choice Block": 27
+  max_per_type:
+    "Single Choice": 100
+    "Multiple Choice": 100
+    "True/False": 100
+    "Single Choice Block": 100
+  semantic:
+    model: "paraphrase-multilingual-MiniLM-L12-v2"
+    cache_dir: "../cache/embeddings"
+    cluster_ratio: 0.25
+
+grading:
+  points_per_type:
+    "Single Choice": 2
+    "Multiple Choice": 3
+    "True/False": 1
+    "Single Choice Block": 3
+
+document:
+  backend: "latex"
+  pdf_engine: "pdflatex"
+  student_version: true
+  marking_sheet: false
+  instructor_version: true
+  include_topic_headers: false
+  include_type_headers: false
+  randomize_answers: true
+  block_questions:
+    indent_questions: false
+    include_medium: true
+    add_images: true
+    image_directory: "../../question database/Figures"
+  format:
+    font: "Arial"
+    font_size: 11
+    line_spacing: 1.5
+
+logging:
+  level: "INFO"
+  file: "exam_generator_unified.log"
