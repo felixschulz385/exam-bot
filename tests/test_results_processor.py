@@ -1,14 +1,32 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
-
 import pandas as pd
 
 from src.analysis.results_processor import ExamResultsProcessor
 
 
 class ResultsProcessorTests(unittest.TestCase):
+    def test_load_results_accepts_semicolon_csv_export(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "results.csv"
+            path.write_text(
+                '"StudentNumber";"Version";"A0";"A1";"RF60"\n'
+                '"";"";"C";"D";""\n'
+                '"2024000001";"";" A ";"b";""\n'
+                '"2024000002";"";"D";"";" C "\n',
+                encoding="utf-8",
+            )
+
+            loaded = ExamResultsProcessor(output_dir=Path(temp_dir)).load_results(path)
+
+        self.assertEqual(list(loaded["Question"]), [0, 1, 60])
+        self.assertEqual(list(loaded["2024000001"][:2]), ["A", "B"])
+        self.assertTrue(pd.isna(loaded["2024000001"].iloc[2]))
+        self.assertEqual(loaded["2024000002"].iloc[0], "D")
+        self.assertTrue(pd.isna(loaded["2024000002"].iloc[1]))
+        self.assertEqual(loaded["2024000002"].iloc[2], "C")
+
     def test_load_marking_sheet_normalizes_columns(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "marking.xlsx"
@@ -30,9 +48,9 @@ class ResultsProcessorTests(unittest.TestCase):
         processor = ExamResultsProcessor(output_dir=Path("/tmp"))
         results_df = pd.DataFrame(
             {
-                "Question": [0, 1],
-                "Alice": ["A", "B"],
-                "Bob": ["B", "B"],
+                "Question": [0, 1, 60],
+                "Alice": ["A", "B", ""],
+                "Bob": ["B", "B", "C"],
             }
         )
         marking_df = pd.DataFrame(
@@ -48,6 +66,8 @@ class ResultsProcessorTests(unittest.TestCase):
 
         self.assertEqual(student_scores["Alice_total"].max(), 5)
         self.assertEqual(student_scores["Bob_total"].max(), 3)
+        self.assertEqual(list(student_scores["Question #"]), [0, 1])
+        self.assertEqual(list(question_stats["Question #"]), [0, 1])
         self.assertEqual(question_stats.loc[0, "# Correct"], 1)
         self.assertEqual(question_stats.loc[1, "# Correct"], 2)
 
@@ -80,14 +100,32 @@ class ResultsProcessorTests(unittest.TestCase):
                     "Discrimination": [0.0, 0.0],
                 }
             )
+            results_df = pd.DataFrame(
+                {
+                    "Question": [0, 1],
+                    "Alice": ["A", "B"],
+                    "Bob": ["B", "B"],
+                }
+            )
 
-            with mock.patch.object(processor, "_create_question_difficulty_chart", return_value=Path(temp_dir) / "q.png"), \
-                mock.patch.object(processor, "_create_score_distribution_chart", return_value=Path(temp_dir) / "s.png"):
-                output_path = processor.generate_summary_report(student_scores, question_stats, "report")
+            output_path = processor.generate_summary_report(
+                student_scores,
+                question_stats,
+                "report",
+                results_df=results_df,
+            )
 
             self.assertTrue(output_path.exists())
-            written = pd.read_excel(output_path, sheet_name="Student Summary", index_col=0)
-            self.assertEqual(list(written.index), ["Alice", "Bob"])
+            self.assertEqual(output_path.name, "report_grading_report.xlsx")
+            with pd.ExcelFile(output_path) as workbook:
+                self.assertEqual(
+                    workbook.sheet_names,
+                    ["Overview", "Student Scores", "Question Analysis", "Answer Matrix", "Score Matrix"],
+                )
+            written = pd.read_excel(output_path, sheet_name="Student Scores")
+            self.assertEqual(list(written["Student"]), ["Alice", "Bob"])
+            answers = pd.read_excel(output_path, sheet_name="Answer Matrix")
+            self.assertEqual(list(answers["Alice"]), ["A", "B"])
 
 
 if __name__ == "__main__":

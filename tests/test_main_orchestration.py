@@ -97,7 +97,39 @@ class MainOrchestrationTests(unittest.TestCase):
             "marking-df",
             "scores-df",
         )
-        fake_processor.generate_summary_report.assert_called_once_with("scores-df", "stats-df", "summary-name")
+        fake_processor.generate_summary_report.assert_called_once_with(
+            "scores-df",
+            "stats-df",
+            "summary-name",
+            results_df="results-df",
+        )
+
+    def test_process_results_defaults_to_results_directory_and_stem(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            results_path = root / "FS26_AdvHeCon.csv"
+            marking_path = root / "marking.xlsx"
+            results_path.touch()
+            marking_path.touch()
+
+            fake_processor = mock.Mock()
+            fake_processor.load_results.return_value = "results-df"
+            fake_processor.load_marking_sheet.return_value = "marking-df"
+            fake_processor.calculate_student_scores.return_value = "scores-df"
+            fake_processor.generate_question_statistics.return_value = "stats-df"
+            fake_processor.generate_summary_report.return_value = root / "FS26_AdvHeCon_grading_report.xlsx"
+
+            with mock.patch.object(main_module, "ExamResultsProcessor", return_value=fake_processor) as processor_cls:
+                main_module.process_results(results_path, marking_path)
+
+        _, processor_kwargs = processor_cls.call_args
+        self.assertEqual(processor_kwargs["output_dir"], root.resolve())
+        fake_processor.generate_summary_report.assert_called_once_with(
+            "scores-df",
+            "stats-df",
+            "FS26_AdvHeCon",
+            results_df="results-df",
+        )
 
 
 if __name__ == "__main__":

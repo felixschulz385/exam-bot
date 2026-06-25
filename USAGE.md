@@ -65,6 +65,8 @@ python main.py \
   --marking-sheet output/exam_20260423_153000/Advanced_Health_Economics_-_Final_Exam_2025_marking_sheet_20260423_153000.xlsx
 ```
 
+By default, this writes a single grading report workbook next to the results file and derives the filename from the results filename, for example `FS26_AdvHeCon_grading_report.xlsx`.
+
 Optional output controls:
 
 ```bash
@@ -75,7 +77,7 @@ python main.py \
   --results-output-name 74283_AHE_2025
 ```
 
-This mode writes summary files and analysis outputs into the requested results output directory.
+This mode writes the grading report workbook into the requested results output directory.
 
 ## Config Guide
 

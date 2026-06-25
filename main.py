@@ -218,11 +218,9 @@ def process_results(results_file: Path, marking_sheet: Path, output_dir: Path = 
 
     logging.info(f"Processing exam results from: {results_file}")
     logging.info(f"Using marking sheet: {marking_sheet}")
-    run_timestamp = timestamp_string()
-    
     # Create output directory if not specified
     if output_dir is None:
-        output_dir = Path(f"output/results_{run_timestamp}").resolve()
+        output_dir = results_file.expanduser().resolve().parent
     else:
         output_dir = output_dir.expanduser().resolve()
 
@@ -230,7 +228,7 @@ def process_results(results_file: Path, marking_sheet: Path, output_dir: Path = 
     
     # Set default output name if not specified
     if output_name is None:
-        output_name = f"exam_results_{run_timestamp.split('_')[0]}"
+        output_name = results_file.stem
     
     # Process results
     processor = get_results_processor_class()(output_dir=output_dir)
@@ -250,7 +248,7 @@ def process_results(results_file: Path, marking_sheet: Path, output_dir: Path = 
         
         # Generate and save summary report
         output_path = processor.generate_summary_report(
-            student_scores, question_stats, output_name
+            student_scores, question_stats, output_name, results_df=results_df
         )
         
         logging.info(f"Results processed successfully. Summary report saved to: {output_path}")
